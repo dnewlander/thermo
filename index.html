@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+  <head>
+    <title>My Thermostat</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css" />
+	<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+
+  </head>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+  <script>
+    $(function () {
+      var socket = io();
+      var xxx;
+      $('form').submit(function(){
+        socket.emit('chat message', $('#m').val());
+        $('#m').val('');
+        return false;
+      });
+      socket.on('ddn', function(msg){
+      switch (msg.frame) {
+        case "thermo":
+            $('#thermo').text(msg.thestring);
+            break;
+        case "office":
+            $('#officetmp').text(msg.thestring);
+            break;
+        case "set":
+            $('#set').text(msg.thestring);
+            if (msg.avg==1)
+            {
+                $('#shouldAverage').text(" (avg)");
+            }
+            else
+            {
+                $('#shouldAverage').text("");
+            }
+            break
+      }
+      });
+    });
+  </script>
+  <body>
+<div class="ui-grid-a">
+<div class="ui-block-a">
+<div class="ui-bar ui-bar-a" style="text-align: center"><span>Current Temperature</span><br/></div>
+<div class="ui-bar ui-bar-a" style="height:60px">Remote<br/><span id="officetmp">??</span>°</div>
+<div class="ui-bar ui-bar-a" style="height:60px">Thermostat<br/><span id="thermo">??</span>°</div>
+</div><!-- /left -->
+<div class="ui-block-b">
+<div class="ui-bar ui-bar-a" style="text-align: center"><span>Set Temperature</span></div>
+<div class="ui-bar ui-bar-a" style="height:60px"><span id="set">??</span>°<span id="shouldAverage" style="font-size: 10">x<span></div>
+<div id="function" class="ui-bar ui-bar-a" style="height:600px"><img src="heating.png"</div>
+</div><!-- /right -->
+</div><!-- /grid-a -->
+  </body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "name": "thermo",
+  "version": "1.0.0",
+  "description": "Particle Photon-based thermostat with remote",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dnewlander/thermo.git"
+  },
+  "author": "Dylan Newlander",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dnewlander/thermo/issues"
+  },
+  "homepage": "https://github.com/dnewlander/thermo#readme",
+  "dependencies": {
+    "express": "^4.16.3",
+    "node-cleanup": "^2.1.2",
+    "node-cron": "^1.2.1",
+    "particle-api-js": "^7.2.0",
+    "socket.io": "^2.1.0",
+    "sqlite3": "^4.0.0",
+    "wundergroundnode": "^0.11.0"
+  }
+}
