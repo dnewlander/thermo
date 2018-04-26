@@ -1,5 +1,9 @@
 "use strict";
 
+//determine if we're in debug mode
+const argv = process.execArgv.join();
+const isDebug = argv.includes('inspect') || argv.includes('debug');
+
 //general variables
 // var weather;
 // var temp;
@@ -17,7 +21,7 @@ var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
 http.listen(config.serverPort, function(){
-  console.log('listening on *:' + config.serverPort);
+  (isDebug) && console.log('listening on *:' + config.serverPort);
 });
 
 // database stuff
@@ -27,7 +31,7 @@ let db = new sqlite3.Database('/var/www/html/phpliteadmin/thermo', sqlite3.OPEN_
   if (err) {
 	return console.error(err.message);
   }
-  console.log('Connected to the "thermo" SQlite database.');
+  (isDebug) && console.log('Connected to the "thermo" SQlite database.');
 });
 
 // file stuff
@@ -100,6 +104,7 @@ function getSetValues(row, thermostat){
  	var currentdate = new Date();
 	var datetime = currentdate.getHours() + ":" + currentdate.getMinutes();
     thermostat.settings.temperature = row.set_temp;
+    console.log("Set " + thermostat.location + " set temperature to " + row.set_temp);
     thermostat.settings.shouldAverage = row.Average;
 	
 	// manual offset/override stuff
@@ -122,17 +127,17 @@ function getSetValues(row, thermostat){
 		thermostat.settings.temperature = row.set_temp + thermostat.settings.offset;
 	}
 	
-	console.log('The ' + thermostat.settings.location + ' is ' + thermostat.settings.temperature + ' at ' + datetime + ' and we ' + (thermostat.settings.shouldAverage ? 'should' : 'should not') + ' average the temperatures');
+	(isDebug) && console.log('The ' + thermostat.location + ' is ' + thermostat.settings.temperature + ' at ' + datetime + ' and we ' + (thermostat.settings.shouldAverage ? 'should' : 'should not') + ' average the temperatures');
 	io.emit('ddn', {"frame":thermostat.settings.thermo_frame,"thestring":thermostat.settings.temperature,"avg":thermostat.settings.shouldAverage});
 }
 
 function doLog(obj, message){
-    message = (obj.temperature == 0 ? `Temperature isn't set yet!` : message);
-    db.run(`INSERT INTO THERMO_LOGS(DATE, LOCATION, TEMP, HUMIDITY, MESSAGE) VALUES (CURRENT_TIMESTAMP, ?, ?, ?, ?)`, [obj.location, Number(obj.temperature), Number(obj.humidity), message], function(err) {
+    message = (obj.readings.temperature == 0 ? `Temperature isn't set yet!` : message);
+    db.run(`INSERT INTO THERMO_LOGS(DATE, LOCATION, TEMP, HUMIDITY, MESSAGE) VALUES (CURRENT_TIMESTAMP, ?, ?, ?, ?)`, [obj.location, Number(obj.readings.temperature), Number(obj.readings.humidity), message], function(err) {
         if(err) {
-            return console.log(err.message);
+            return (isDebug) && console.log(err.message);
         }
-        console.log(`Logged current conditions from ` + obj.location);
+        (isDebug) && console.log(`Logged current conditions from ` + obj.location);
     });
 }
 
@@ -141,19 +146,19 @@ function doParticleLookup(obj)
     particle.getVariable({auth: token, deviceId: obj.deviceId, name: 'temperature'}).then(function(data) {
 	  obj.readings.last_temperature = obj.readings.temperature;
       obj.readings.temperature = ((Math.abs(data.body.result - obj.temp) >= 15) && (obj.readings.temperature != 0)? obj.readings.temperature : data.body.result);
-      console.log('The ' + obj.location + ' temperature is ' + obj.readings.temperature);
+      (isDebug) && console.log('The ' + obj.location + ' temperature is ' + obj.readings.temperature);
       io.emit('ddn', {"frame": obj.frame, "thestring": obj.readings.temperature});
     }, function(err) {
-      console.log('An error occurred while getting attrs:', err);
+      (isDebug) && console.log('An error occurred while getting attrs:', err);
       //obj.temperature = -1;
     });
       particle.getVariable({auth: token, deviceId: obj.deviceId, name: 'humidity'}).then(function(data) {
       obj.readings.last_humidity = obj.readings.humidity;
 	  obj.readings.humidity = data.body.result;
-      console.log('The ' + obj.location + ' humidity is ' + obj.readings.humidity);
+      (isDebug) && console.log('The ' + obj.location + ' humidity is ' + obj.readings.humidity);
       //io.emit('ddn', {"frame": "thermo", "thestring": obj.readings.humidity});
     }, function(err) {
-      console.log('An error occurred while getting attrs:', err);
+      (isDebug) && console.log('An error occurred while getting attrs:', err);
       //obj.humidity = -1;
     });
     doLog(obj, 'success');
@@ -191,10 +196,10 @@ function init() {
 	particle.login(config.particle_user).then(
 	  function(data) {
 		  token = data.body.access_token;
-		  console.log(token);
+		  (isDebug) && console.log(token);
 	  },
 	  function(err) {
-		  console.log('Could not log in.', err);
+		  (isDebug) && console.log('Could not log in.', err);
 	  }
 	);
     
@@ -214,7 +219,7 @@ function init() {
 	wunderground = new Wunderground(config.wundergroundKey);
 
 	var getWeather = cron.schedule('*/5 * * * *', function() {
-		console.log('time to check the weather!');
+		(isDebug) && console.log('time to check the weather!');
 		wunderground.conditions().request('87104', function(err, response) {
 			var cur = response.current_observation;
 			outsideConditions = cur.weather;
@@ -222,11 +227,11 @@ function init() {
 			outsideTemp = cur.temp_f;
 //			io.emit('chat message', outsideTemp);
 //			io.emit('chat message', outsideConditions);
-			console.log('The outside temperature is ' + outsideTemp);
-            console.log('The current weather is: ' + outsideConditions);
+			(isDebug) && console.log('The outside temperature is ' + outsideTemp);
+            (isDebug) && console.log('The current weather is: ' + outsideConditions);
             fs.writeFile("weather.log", outsideConditions + "\n", function(err) {
                 if(err) {
-                    return console.log(err);
+                    return (isDebug) && console.log(err);
                 }
             });
 		});
@@ -234,23 +239,23 @@ function init() {
 	false);
 	
 	var callback = function() {
-		console.log('Successfully logged in');
+		(isDebug) && console.log('Successfully logged in');
 	};
     
     function controlThermostat(thermostat, sensor){
         var tempToUse = (thermostat.settings.shouldAverage == 1 ? (sensor.readings.temperature + thermostat.readings.temperature)/2 : sensor.readings.temperature);
-        var message = sensor.readings.location + ': ' + sensor.readings.temperature + '; ' + thermostat.location + ': ' + thermostat.readings.temperature + (thermostat.settings.shouldAverage == 1 ? '; ' + tempToUse: '');
-        doLog(thermostat.readings, message);
-        console.log('We are using ' + tempToUse + ' as the current temp.');
+        var message = sensor.location + ': ' + sensor.readings.temperature + '; ' + thermostat.location + ': ' + thermostat.readings.temperature + (thermostat.settings.shouldAverage == 1 ? '; ' + tempToUse: '');
+        doLog(thermostat, message);
+        (isDebug) && console.log('We are using ' + tempToUse + ' as the current temp.');
 		particle.callFunction({auth: token, deviceId: thermostat.deviceId, name: 'thermo', argument: thermostat.settings.temperature + '-' + tempToUse}).then(function(data){
-			console.log(thermostat.location + ' Thermo function called successfully:', data);
+			(isDebug) && console.log(thermostat.location + ' Thermo function called successfully:', data);
 		}, function(err) {
-			console.log(thermostat.location + ' An error occurred calling Thermo function:', err);
+			(isDebug) && console.log(thermostat.location + ' An error occurred calling Thermo function:', err);
 		});
 		particle.callFunction({auth: token, deviceId: sensor.deviceId, name: 'remote', argument: thermostat.settings.temperature + '-' + outsideTemp + '-' + weatherIcon}).then(function(data){
-			console.log(sensor.location + ' Remote function called successfully:', data);
+			(isDebug) && console.log(sensor.location + ' Remote function called successfully:', data);
 		}, function(err) {
-			console.log(sensor.location + ' An error occurred calling Remote function:', err);
+			(isDebug) && console.log(sensor.location + ' An error occurred calling Remote function:', err);
 		});
     }
 	
@@ -267,16 +272,16 @@ function init() {
 	doDownstairsThermostat.start();
 }
 io.on('connection', function(socket){
-  console.log('a user connected');
+  (isDebug) && console.log('a user connected');
     io.emit('ddn', {"frame" : thermostats['downstairs'].frame,"thestring" : thermostats['downstairs'].settings.temperature, "avg":thermostats['downstairs'].settings.shouldAverage});
     io.emit('ddn', {"frame" : thermostats['downstairs'].frame, "thestring": thermostats['downstairs'].temperature});
     io.emit('ddn', {"frame" : sensors['office'].frame, "thestring" : sensors['office'].temperature});
   socket.on('chat message', function(msg){
-    console.log('got a message!!');
+    (isDebug) && console.log('got a message!!');
  //   io.emit('chat message', msg);
   });
   socket.on('disconnect', function(){
-    console.log('user disconnected');
+    (isDebug) && console.log('user disconnected');
   });
 });
 
@@ -285,7 +290,7 @@ nodeCleanup(function (exitCode, signal) {
 		if (err) {
 		console.error(err.message);
 		}
-		console.log('Close the database connection.');
+		(isDebug) && console.log('Close the database connection.');
 	});
 });
 
@@ -295,26 +300,26 @@ app.get('/', function(req, res){
 
 app.get('/temp/add', function(req, res)
 {
-	console.log('Got a request to increase temp');
-	//console.log(req);
+	(isDebug) && console.log('Got a request to increase temp');
+	//(isDebug) && console.log(req);
 	manual_offset += 4;
-	console.log('manual_offset is now ' + manual_offset);
+	(isDebug) && console.log('manual_offset is now ' + manual_offset);
 	res.json({"variance":manual_offset});
 });
 
 app.get('/temp/remove', function(req, res)
 {
-	console.log('Got a request to decrease temp');
+	(isDebug) && console.log('Got a request to decrease temp');
 	manual_offset -= 4;
-	console.log('manual_offset is now ' + manual_offset);
+	(isDebug) && console.log('manual_offset is now ' + manual_offset);
 	res.json({"variance":manual_offset});
 });
 
 app.get('/temp/reset', function(req, res)
 {
-	console.log('Got a request to reset temp to default');
+	(isDebug) && console.log('Got a request to reset temp to default');
 	manual_offset = 0;
-	console.log('manual_offset is now ' + manual_offset);
+	(isDebug) && console.log('manual_offset is now ' + manual_offset);
 	res.json({"variance":manual_offset});
 });
 
@@ -325,23 +330,23 @@ app.get('/temp', function(req, res)
 		case 'offset':
 			manual_offset += parseInt(req.query.value);
 			manual_override = 0;
-			console.log('manual_offset is now ' + manual_offset);
+			(isDebug) && console.log('manual_offset is now ' + manual_offset);
 			res.json({"change":"offset", "amount":manual_offset});
 			break;
 		case 'override':
 			manual_override = parseInt(req.query.value);
 			manual_offset = 0;
-			console.log('manual override is now ' + manual_override);
+			(isDebug) && console.log('manual override is now ' + manual_override);
 			res.json({"change":"override", "amount":manual_override});
 			break;
 		case 'reset':
 			manual_override = 0;
 			manual_offset = 0;
-			console.log('reset to normal set amount');
+			(isDebug) && console.log('reset to normal set amount');
 			res.json({"change":"reset"});
 			break;
         default:
-			console.log("I didn't understand this request: " + req.query.type);
+			(isDebug) && console.log("I didn't understand this request: " + req.query.type);
 	}
 });
 
