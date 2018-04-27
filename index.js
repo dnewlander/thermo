@@ -101,11 +101,23 @@ function setWeatherIcon() {
 }
 
 function getSetValues(row, thermostat){
+    console.log ("I'm gettingSetValues for " + thermostat.location);
  	var currentdate = new Date();
 	var datetime = currentdate.getHours() + ":" + currentdate.getMinutes();
-    thermostat.settings.temperature = row.set_temp;
-    console.log("Set " + thermostat.location + " set temperature to " + row.set_temp);
+    thermostat.settings.temperature = row.set_temperature;
+    console.log("Set " + thermostat.location + " set temperature to " + row.set_temperature);
     thermostat.settings.shouldAverage = row.Average;
+    switch (row.function) {
+        case "heat":
+            thermostat.settings.function = 1;
+            break;
+        case "cool":
+            thermostat.settings.function = 4;
+            break;
+        default:
+            thermostat.settings.function = 0;
+            break
+    };
 	
 	// manual offset/override stuff
 	
@@ -124,11 +136,12 @@ function getSetValues(row, thermostat){
 	else
 	{
 		// this is valid for any values of thermostat.settings.offset
-		thermostat.settings.temperature = row.set_temp + thermostat.settings.offset;
+		thermostat.settings.temperature = row.set_temperature + thermostat.settings.offset;
 	}
 	
 	(isDebug) && console.log('The ' + thermostat.location + ' is ' + thermostat.settings.temperature + ' at ' + datetime + ' and we ' + (thermostat.settings.shouldAverage ? 'should' : 'should not') + ' average the temperatures');
-	io.emit('ddn', {"frame":thermostat.settings.thermo_frame,"thestring":thermostat.settings.temperature,"avg":thermostat.settings.shouldAverage});
+	io.emit('ddn', {"frame":thermostat.settings.frame,"thestring":thermostat.settings.temperature,"avg":thermostat.settings.shouldAverage});
+    (isDebug) && console.log('Should have just emitted ' + thermostat.settings.temperature + ' to web UI frame ' + thermostat.settings.frame);
 }
 
 function doLog(obj, message){
@@ -147,7 +160,7 @@ function doParticleLookup(obj)
 	  obj.readings.last_temperature = obj.readings.temperature;
       obj.readings.temperature = ((Math.abs(data.body.result - obj.temp) >= 15) && (obj.readings.temperature != 0)? obj.readings.temperature : data.body.result);
       (isDebug) && console.log('The ' + obj.location + ' temperature is ' + obj.readings.temperature);
-      io.emit('ddn', {"frame": obj.frame, "thestring": obj.readings.temperature});
+      io.emit('ddn', {"frame": obj.readings.frame, "thestring": obj.readings.temperature});
     }, function(err) {
       (isDebug) && console.log('An error occurred while getting attrs:', err);
       //obj.temperature = -1;
@@ -169,19 +182,17 @@ function init() {
 	var getSetTemp = cron.schedule('*/1 * * * *', function() {
 		db.serialize(() => {
 		var currentdate = new Date();
-		var datetime = currentdate.getHours() + ":" + currentdate.getMinutes();
+        var this_date = ("00"+currentdate.getMonth()).slice(-2) + '/' + ("00"+currentdate.getDate()).slice(-2) + '/1900';
+		var this_time = currentdate.getHours() + ":" + currentdate.getMinutes();
 		// Get set temperature for the current time
-		db.get(`SELECT start_time, end_time, set_temp, heating, cooling, Average
-				FROM thermo
-				JOIN schedule
-				ON thermo.schedule_id = schedule.schedule_id
-				JOIN function
-				ON thermo.function_id = function.function_id
-				WHERE schedule_name = 'test'
-				AND CAST(? AS TIME) BETWEEN CAST(start_time AS TIME) AND CAST(end_time AS TIME)
-				ORDER BY start_time`, datetime, (err, row) => {
+		db.get(`SELECT start_time, end_time, set_temperature, function, average
+				FROM full_schedules
+				WHERE CAST($time AS TIME) BETWEEN CAST(start_time AS TIME) AND CAST(end_time AS TIME)
+                AND CAST($date AS DATE) BETWEEN CAST(start_date AS DATE) AND CAST(end_date AS DATE)
+				ORDER BY start_time`, {$time : this_time, $date : this_date}, (err, row) => {
 					if (err){
 					throw err;
+                    console.log(err);
 					}
 					return row
 					? getSetValues(row, thermostats['downstairs'])
@@ -244,18 +255,50 @@ function init() {
     
     function controlThermostat(thermostat, sensor){
         var tempToUse = (thermostat.settings.shouldAverage == 1 ? (sensor.readings.temperature + thermostat.readings.temperature)/2 : sensor.readings.temperature);
-        var message = sensor.location + ': ' + sensor.readings.temperature + '; ' + thermostat.location + ': ' + thermostat.readings.temperature + (thermostat.settings.shouldAverage == 1 ? '; ' + tempToUse: '');
+        var message = sensor.location + ': ' + sensor.readings.temperature + '; ' + thermostat.location + ': ' + thermostat.readings.temperature + (thermostat.settings.shouldAverage == 1 ? '; ' + tempToUse: ';');
         doLog(thermostat, message);
         (isDebug) && console.log('We are using ' + tempToUse + ' as the current temp.');
-		particle.callFunction({auth: token, deviceId: thermostat.deviceId, name: 'thermo', argument: thermostat.settings.temperature + '-' + tempToUse}).then(function(data){
-			(isDebug) && console.log(thermostat.location + ' Thermo function called successfully:', data);
+		particle.callFunction({auth: token, deviceId: thermostat.deviceId, name: 'thermo', argument: thermostat.settings.temperature + '-' + tempToUse + '-' +thermostat.settings.function}).then(function(data){
+			(isDebug) && console.log(thermostat.location + ' Thermo function called successfully:', data)
+            var functiona = "";
+            var fan = "";
+            console.log (data.body.return_value);
+            switch(data.body.return_value) {
+                case 0:
+                    functiona = "";
+                    fan = "";
+                    break;
+                case 1:
+                    functiona = "heating.png";
+                    fan = "";
+                    break;
+                case 2:
+                    functiona = "";
+                    fan = "fan.png";
+                    break;
+                case 3:
+                    functiona = "heating.png";
+                    fan = "fan.png";
+                    break;
+                case 4:
+                    functiona = "cooling.png";
+                    fan = "";
+                    break;
+                case 6:
+                    functiona = "cooling.png";
+                    fan = "fan.png";
+                    break
+            }
+            console.log(thermostat.settings.function_frame + ":" + functiona + ":" + fan);
+            io.emit('ddn', {"frame": thermostat.settings.function_frame, "function": functiona, "fan": fan});
+;
 		}, function(err) {
 			(isDebug) && console.log(thermostat.location + ' An error occurred calling Thermo function:', err);
 		});
 		particle.callFunction({auth: token, deviceId: sensor.deviceId, name: 'remote', argument: thermostat.settings.temperature + '-' + outsideTemp + '-' + weatherIcon}).then(function(data){
 			(isDebug) && console.log(sensor.location + ' Remote function called successfully:', data);
 		}, function(err) {
-			(isDebug) && console.log(sensor.location + ' An error occurred calling Remote function:', err);
+			(isDebug) && console.log(thermostats.location + ' An error occurred calling Remote function:', err);
 		});
     }
 	
@@ -273,9 +316,11 @@ function init() {
 }
 io.on('connection', function(socket){
   (isDebug) && console.log('a user connected');
-    io.emit('ddn', {"frame" : thermostats['downstairs'].frame,"thestring" : thermostats['downstairs'].settings.temperature, "avg":thermostats['downstairs'].settings.shouldAverage});
-    io.emit('ddn', {"frame" : thermostats['downstairs'].frame, "thestring": thermostats['downstairs'].temperature});
-    io.emit('ddn', {"frame" : sensors['office'].frame, "thestring" : sensors['office'].temperature});
+  //set temp
+    io.emit('ddn', {"frame" : thermostats['downstairs'].settings.frame,"thestring" : thermostats['downstairs'].settings.temperature, "avg":thermostats['downstairs'].settings.shouldAverage});
+    // current temps
+    io.emit('ddn', {"frame" : thermostats['downstairs'].readings.frame, "thestring": thermostats['downstairs'].readings.temperature});
+    io.emit('ddn', {"frame" : sensors['office'].readings.frame, "thestring" : sensors['office'].readings.temperature});
   socket.on('chat message', function(msg){
     (isDebug) && console.log('got a message!!');
  //   io.emit('chat message', msg);

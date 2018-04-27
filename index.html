@@ -21,8 +21,8 @@
       });
       socket.on('ddn', function(msg){
       switch (msg.frame) {
-        case "thermo":
-            $('#thermo').text(msg.thestring);
+        case "living":
+            $('#living').text(msg.thestring);
             break;
         case "office":
             $('#officetmp').text(msg.thestring);
@@ -37,6 +37,10 @@
             {
                 $('#shouldAverage').text("");
             }
+            break;
+        case "function":
+            $('#function').attr("src", msg.function);
+            $('#fan').attr("src", msg.fan);   
             break
       }
       });
@@ -47,12 +51,12 @@
 <div class="ui-block-a">
 <div class="ui-bar ui-bar-a" style="text-align: center"><span>Current Temperature</span><br/></div>
 <div class="ui-bar ui-bar-a" style="height:60px">Remote<br/><span id="officetmp">??</span>°</div>
-<div class="ui-bar ui-bar-a" style="height:60px">Thermostat<br/><span id="thermo">??</span>°</div>
+<div class="ui-bar ui-bar-a" style="height:60px">Thermostat<br/><span id="living">??</span>°</div>
 </div><!-- /left -->
 <div class="ui-block-b">
 <div class="ui-bar ui-bar-a" style="text-align: center"><span>Set Temperature</span></div>
 <div class="ui-bar ui-bar-a" style="height:60px"><span id="set">??</span>°<span id="shouldAverage" style="font-size: 10">x<span></div>
-<div id="function" class="ui-bar ui-bar-a" style="height:600px"><img src="heating.png"</div>
+<div class="ui-bar ui-bar-a" style="height:600px"><img id="function" src=""/><img id="fan" src=""/></div>
 </div><!-- /right -->
 </div><!-- /grid-a -->
   </body>

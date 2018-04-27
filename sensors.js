@@ -4,8 +4,8 @@ module.exports = {
     "office" : {
       "location":"Office Sensor",
       "deviceId":config.officeSensorDeviceId,
-      "frame":"office",
       "readings":{  
+         "frame":"office",
          "temperature":0,
          "last_temperature":0,
          "humidity":0,
@@ -13,10 +13,10 @@ module.exports = {
       },
     },
     "living" : {
-      "location":"Office Sensor",
+      "location":"Living Room Sensor",
       "deviceId":config.livingSensorDeviceId,
-      "frame":"living",
       "readings":{  
+         "frame":"living",
          "temperature":0,
          "last_temperature":0,
          "humidity":0,
@@ -26,8 +26,8 @@ module.exports = {
     "ben" : {
       "location":"Office Sensor",
       "deviceId":config.benSensorDeviceId,
-      "frame":"ben",
       "readings":{  
+         "frame":"ben",
          "temperature":0,
          "last_temperature":0,
          "humidity":0,
@@ -37,8 +37,8 @@ module.exports = {
     "jordan" : {
       "location":"Office Sensor",
       "deviceId":config.jordanSensorDeviceId,
-      "frame":"jordan",
       "readings":{  
+         "frame":"jordan",
          "temperature":0,
          "last_temperature":0,
          "humidity":0,
