@@ -176,6 +176,57 @@ function doParticleLookup(obj)
     });
     doLog(obj, 'success');
 }
+function emitFunction(thermostat, value)
+{
+    var functiona = "";
+    var fan = "";
+    console.log(value);
+    switch (value) {
+        case 0:
+            functiona = "";
+            fan = "";
+            break;
+        case 1:
+            functiona = "heating.png";
+            fan = "";
+            break;
+        case 2:
+            functiona = "";
+            fan = "fan.png";
+            break;
+        case 3:
+            functiona = "heating.png";
+            fan = "fan.png";
+            break;
+        case 4:
+            functiona = "cooling.png";
+            fan = "";
+            break;
+        case 6:
+            functiona = "cooling.png";
+            fan = "fan.png";
+            break
+    }
+    io.emit('ddn', {
+        "frame": thermostat.settings.function_frame,
+        "function": functiona,
+        "fan": fan
+    });
+}
+
+function doFan(thermostat, value) {
+particle.callFunction({
+    auth: token,
+    deviceId: thermostat.deviceId,
+    name: 'thermo',
+    argument: '0-0-' + ((value == "on") ? 2 : 0)
+}).then(function(data) {
+        (isDebug) && console.log(thermostat.location + ' Thermo function called successfully:', data);
+        emitFunction(thermostat, data.body.return_value);
+    }, function(err) {
+        (isDebug) && console.log(thermostat.location + ' An error occurred calling Thermo function:', err);
+    });
+}
 
 function init() {
 	//set up Set Temperature loop
@@ -260,38 +311,7 @@ function init() {
         (isDebug) && console.log('We are using ' + tempToUse + ' as the current temp.');
 		particle.callFunction({auth: token, deviceId: thermostat.deviceId, name: 'thermo', argument: thermostat.settings.temperature + '-' + tempToUse + '-' +thermostat.settings.function}).then(function(data){
 			(isDebug) && console.log(thermostat.location + ' Thermo function called successfully:', data)
-            var functiona = "";
-            var fan = "";
-            console.log (data.body.return_value);
-            switch(data.body.return_value) {
-                case 0:
-                    functiona = "";
-                    fan = "";
-                    break;
-                case 1:
-                    functiona = "heating.png";
-                    fan = "";
-                    break;
-                case 2:
-                    functiona = "";
-                    fan = "fan.png";
-                    break;
-                case 3:
-                    functiona = "heating.png";
-                    fan = "fan.png";
-                    break;
-                case 4:
-                    functiona = "cooling.png";
-                    fan = "";
-                    break;
-                case 6:
-                    functiona = "cooling.png";
-                    fan = "fan.png";
-                    break
-            }
-            console.log(thermostat.settings.function_frame + ":" + functiona + ":" + fan);
-            io.emit('ddn', {"frame": thermostat.settings.function_frame, "function": functiona, "fan": fan});
-;
+            emitFunction(thermostat, data.body.return_value);
 		}, function(err) {
 			(isDebug) && console.log(thermostat.location + ' An error occurred calling Thermo function:', err);
 		});
@@ -301,7 +321,8 @@ function init() {
 			(isDebug) && console.log(thermostats.location + ' An error occurred calling Remote function:', err);
 		});
     }
-	
+    
+
 	// set up doThermostat loop
 	var doDownstairsThermostat = cron.schedule('*/1 * * * *', function(){
         controlThermostat(thermostats['downstairs'], sensors['office']);
@@ -338,9 +359,16 @@ nodeCleanup(function (exitCode, signal) {
 		(isDebug) && console.log('Close the database connection.');
 	});
 });
-
+    
 app.get('/', function(req, res){
   res.sendFile(__dirname + '/index.html');
+});
+
+app.get('/fan', function(req, res)
+{
+    doFan(thermostats[req.query.location], req.query.value);
+    (isDebug) && console.log(req.query.location + ' fan turned on');
+    res.json({"location":req.query.location, "fan":req.query.value});
 });
 
 app.get('/temp/add', function(req, res)
